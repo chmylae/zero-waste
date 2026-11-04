@@ -1,0 +1,8 @@
+{% extends '_auth_base.html' %}
+{% block title %}{{ code }} · Zero Waste AI{% endblock %}
+{% block content %}
+<p class="big-num">{{ code }}</p>
+<h2 data-t="{{ 'err403' if code == 403 else 'err404' }}">{{ 'Бұл бетке кіру рұқсаты жоқ' if code == 403 else 'Бет табылмады' }}</h2>
+<p class="muted" style="margin:10px 0 22px" data-t="{{ 'err403d' if code == 403 else 'err404d' }}"></p>
+<div class="row"><a class="btn primary" href="/" data-t="back_home">Басты бетке оралу</a>{% if not me %}<a class="btn ghost" href="/login" data-t="login">Кіру</a>{% endif %}</div>
+{% endblock %}

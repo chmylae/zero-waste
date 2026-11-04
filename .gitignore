@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+zero_waste.db
+.secret_key
+static/uploads/*
+!static/uploads/.gitkeep
+!static/uploads/reports/
+static/uploads/reports/*
+!static/uploads/reports/.gitkeep

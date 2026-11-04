@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>{% block title %}Zero Waste AI{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
+</head>
+<body class="auth-page">
+<div class="auth-grid">
+ <aside class="auth-side">
+  <a class="brand" href="/" aria-label="Zero Waste AI">
+   <svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="11" fill="var(--sky-ink)"/><circle cx="20" cy="17" r="7" fill="var(--sun)"/><path d="M7 29c6-5 9-5 13-1s8 4 13-1v5H7z" fill="var(--sky)"/></svg>
+   <span><b>Zero Waste AI</b><small data-t="brand_sub">Таза қала платформасы</small></span>
+  </a>
+  <div>
+   <h1 data-t="auth_side_title">Қалаңыздың тазалығына үлес қосыңыз</h1>
+   <ul class="auth-points">
+    <li data-t="auth_p1">Қоқыс орнын суретпен хабарлаңыз және мәртебесін бақылаңыз</li>
+    <li data-t="auth_p2">Дайын өтініш мәтіні мен қажетті телефон нөмірлерін алыңыз</li>
+    <li data-t="auth_p3">Кәсіпорын аккаунтында қалдық журналы, болжам мен есептер</li>
+   </ul>
+  </div>
+  <a class="auth-back" href="/" data-t="back_home">Басты бетке оралу</a>
+ </aside>
+ <main class="auth-main">
+  <div class="auth-top"><select class="lang" id="lang" aria-label="Language"><option value="kk">ҚАЗ</option><option value="ru">РУС</option><option value="en">ENG</option></select></div>
+  <div class="auth-card">
+   {% with messages=get_flashed_messages(with_categories=true) %}{% for c,m in messages %}<p class="note {{ 'ok' if c=='ok' else 'bad' }}" data-t="fl_{{ m }}">{{ m }}</p>{% endfor %}{% endwith %}
+   {% block content %}{% endblock %}
+  </div>
+ </main>
+</div>
+<script src="{{ url_for('static', filename='site-i18n.js') }}"></script>
+<script src="{{ url_for('static', filename='auth.js') }}"></script>
+</body>
+</html>

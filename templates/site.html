@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Zero Waste AI</title>
+<meta name="description" content="Қоқыс туралы суретпен хабарлау, ластану картасы, жеке кабинет және админ панелі.">
+<meta name="csrf" content="{{ csrf_token() }}">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
+</head>
+<body>
+<header class="top">
+ <div class="wrap">
+  <a class="brand" href="/" aria-label="Zero Waste AI">
+   <svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="11" fill="var(--sky)"/><circle cx="20" cy="17" r="7" fill="var(--sun)"/><path d="M7 29c6-5 9-5 13-1s8 4 13-1v5H7z" fill="var(--sky-ink)" opacity=".9"/></svg>
+   <span><b>Zero Waste AI</b><small data-t="brand_sub">Таза қала платформасы</small></span>
+  </a>
+  <nav class="nav" id="nav">
+   <a href="/" data-t="nav_home">Басты бет</a>
+   <a href="/report" class="cta" data-t="nav_report">Қоқысты хабарлау</a>
+   <a href="/map" data-t="nav_map">Карта</a>
+   <a href="/cabinet" data-t="nav_user">Жеке кабинет</a>
+   {% if me and me.role == 'admin' %}<a href="/admin" data-t="nav_admin">Админ панелі</a>{% endif %}
+  </nav>
+  <select class="lang" id="lang" aria-label="Тіл / Язык / Language"><option value="kk">ҚАЗ</option><option value="ru">РУС</option><option value="en">ENG</option></select>
+  <div class="auth-area">
+   {% if me %}
+   <a class="me-chip" href="/cabinet" title="{{ me.email }}"><span class="avatar sm">{{ me.name[:1]|upper }}</span><span class="me-name">{{ me.name }}</span></a>
+   <a class="btn sm ghost" href="/logout" data-t="logout">Шығу</a>
+   {% else %}
+   <a class="btn sm ghost" href="/login" data-t="login">Кіру</a>
+   <a class="btn sm primary" href="/register" data-t="register">Тіркелу</a>
+   {% endif %}
+  </div>
+ </div>
+</header>
+{% with messages=get_flashed_messages(with_categories=true) %}{% if messages %}<div class="wrap flash-wrap">{% for c,m in messages %}<p class="note {{ 'ok' if c=='ok' else 'bad' }}" data-t="fl_{{ m }}">{{ m }}</p>{% endfor %}</div>{% endif %}{% endwith %}
+
+<main>
+<!-- HOME -->
+<section class="view" id="v-home">
+ <div class="wrap">
+  <div class="hero">
+   <div>
+    <div class="kicker" data-t="hero_kicker">Қазақстанның таза қалалары үшін</div>
+    <h1 data-th="hero_title">Таза қала бір суреттен <em>басталады</em></h1>
+    <p class="lead" data-t="hero_lead">Көшеде, аулада немесе табиғатта қоқыс үйіндісін көрдіңіз бе? Суретке түсіріп, орнын белгілеңіз. Жүйе қоқыс түрін талдап, шешім жолдарын ұсынады, әкімдікке арналған дайын өтініш мәтінін жазады және орынды ортақ картаға қосады.</p>
+    <div class="row">
+     <a class="btn primary" href="/report" data-t="cta_report">Қоқысты хабарлау</a>
+     <a class="btn ghost" href="/map" data-t="cta_map">Ластану картасын ашу</a>
+    </div>
+   </div>
+   <div class="hero-card">
+    <div class="row between"><b data-t="live_title">Ластану картасы, тікелей эфир</b><span class="pill st-resolved" id="liveBadge" data-t="live_badge">Жаңартылып тұрады</span></div>
+    <div id="heroMap" style="margin-top:12px"></div>
+    <div class="live-stats">
+     <div><b id="hsTotal">0</b><span data-t="s_total">Барлық хабарлама</span></div>
+     <div><b id="hsNew">0</b><span data-t="s_new">Жаңа</span></div>
+     <div><b id="hsProg">0</b><span data-t="s_progress">Қаралуда</span></div>
+     <div><b id="hsDone">0</b><span data-t="s_resolved">Шешілді</span></div>
+    </div>
+   </div>
+  </div>
+ </div>
+
+ <div class="section"><div class="wrap">
+  <div class="section-head"><h2 data-t="how_title">Хабарлама қалай жұмыс істейді</h2><p data-t="how_desc">Бір хабарлама төрт қадамнан өтеді. Әр қадамның нәтижесі картада және жеке кабинетте көрінеді.</p></div>
+  <div class="steps">
+   <div class="step"><span class="n">1</span><h3 data-t="st1">Суретке түсіріңіз</h3><p data-t="st1d">Қоқыс үйіндісін анық түсіріңіз. Телефон суретінде орын координаттары болса, жүйе оны картаға өзі қояды.</p></div>
+   <div class="step"><span class="n">2</span><h3 data-t="st2">Орнын белгілеңіз</h3><p data-t="st2d">Қаланы таңдап, картадан нақты нүктені басыңыз немесе мекенжай мен бағдарды жазыңыз.</p></div>
+   <div class="step"><span class="n">3</span><h3 data-t="st3">Талдау мен шешім алыңыз</h3><p data-t="st3d">Жасанды интеллект қоқыс құрамын, қауіп деңгейін және көлемін бағалап, график пен нақты шешімдер береді.</p></div>
+   <div class="step"><span class="n">4</span><h3 data-t="st4">Өтініш жіберіп, бақылаңыз</h3><p data-t="st4d">Дайын өтініш мәтінін көшіріп, 109 немесе eOtinish арқылы жолдаңыз. Мәртебесін кабинеттен бақылаңыз.</p></div>
+  </div>
+ </div></div>
+
+ <div class="section" id="problem"><div class="wrap">
+  <div class="section-head"><h2 data-t="problem_title">Әр қалдық жоғалған мүмкіндік</h2><p data-t="problem_desc">Көптеген кәсіпорындар мен қалалар қалдықты тек пайда болғаннан кейін есептейді. Ал оның себебін ерте анықтау шығынды азайтудың кілті.</p></div>
+  <div class="cards3">
+   <article class="card"><h3 data-t="problem_1">Көрінбейтін шығын</h3><p data-t="problem_1d">Шикізаттың артық жұмсалуы мен ақаулар нақты уақытта байқалмайды.</p></article>
+   <article class="card"><h3 data-t="problem_2">Кеш қабылданған шешім</h3><p data-t="problem_2d">Деректер әр жерде сақталып, өзгеріс кеш талданады. Заңсыз қоқыс үйінділері айлап жатып қалады.</p></article>
+   <article class="card"><h3 data-t="problem_3">Өңдеу мүмкіндігін жоғалту</h3><p data-t="problem_3d">Сұрыпталмаған материал қайта өңдеуге жарамсыз болып қалады да, полигонға кетеді.</p></article>
+  </div>
+ </div></div>
+
+ <div class="section" id="solution"><div class="wrap split">
+  <div>
+   <div class="kicker" data-t="solution_kicker">Шешім</div>
+   <h2 data-t="solution_title">Бақылаудан алдын ала әрекетке</h2>
+   <p class="muted" style="margin-top:14px;font-size:1.1rem" data-t="solution_desc">Платформа азаматтардың хабарламаларын және кәсіпорын деректерін бір жерге жинап, қалдық көздерін анықтауға, болашақ көлемді болжауға және нақты әрекет ұсынуға көмектеседі.</p>
+   <ul class="checks">
+    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg><span data-t="solution_b1">Қалдықтарды бір жүйеде тіркеу</span></li>
+    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg><span data-t="solution_b2">Суреттен қоқыс құрамын талдау</span></li>
+    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg><span data-t="solution_b3">Қалдық көлемі мен трендін болжау</span></li>
+    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg><span data-t="solution_b4">Экономикалық және экологиялық әсерді өлшеу</span></li>
+   </ul>
+  </div>
+  <div class="flow">
+   <div><b data-t="flow1">Дерек</b><span data-t="flow1d">Сурет, орын, қоқыс түрі және кәсіпорын жазбалары</span></div>
+   <div><b data-t="flow2">Талдау</b><span data-t="flow2d">Құрам, қауіп деңгейі, көлем және тренд</span></div>
+   <div><b data-t="flow3">Әрекет</b><span data-t="flow3d">Шешімдер, өтініш, телефон, мәртебені бақылау</span></div>
+  </div>
+ </div></div>
+
+ <div class="section" id="features"><div class="wrap">
+  <div class="section-head"><h2 data-t="features_title">Азаматқа да, кәсіпорынға да бір жүйе</h2><p data-t="features_desc">Ашық карта мен хабарламалар әркімге қолжетімді. Кәсіпорын бөлімдері жеке кабинетте жұмыс істейді.</p></div>
+  <div class="cards3">
+   <article class="card"><span class="tag" data-t="f_city">Азаматтарға</span><h3 data-t="f_report">Қоқыс туралы хабарлама</h3><p data-t="f_report_d">Сурет, орын және сипаттама. Талдау, график, шешімдер мен дайын өтініш бір экранда.</p></article>
+   <article class="card"><span class="tag" data-t="f_city">Азаматтарға</span><h3 data-t="f_map">Ластану картасы</h3><p data-t="f_map_d">Барлық хабарлама суретімен және мәртебесімен картада көрінеді. Сүзгі және қала бойынша іздеу бар.</p></article>
+   <article class="card"><span class="tag" data-t="f_city">Азаматтарға</span><h3 data-t="f_appeal">Ресми өтініш және телефон</h3><p data-t="f_appeal_d">109, 1414 және 112 нөмірлері, eOtinish порталы және қоңырау кезінде айтатын дайын мәтін.</p></article>
+   <article class="card"><span class="tag" data-t="f_biz">Кәсіпорынға</span><h3 data-t="f_scanner">Қалдық сканері</h3><p data-t="feature_scanner">Қалдық суретін жүктеп, материал түрін тіркеу және сұрыптау бағытын алу.</p></article>
+   <article class="card"><span class="tag" data-t="f_biz">Кәсіпорынға</span><h3 data-t="f_pred">Болжам және EcoScore</h3><p data-t="feature_prediction">7 және 30 күндік қалдық көлемін болжау, экологиялық тиімділікті 100 балдық жүйемен бағалау.</p></article>
+   <article class="card"><span class="tag" data-t="f_admin">Әкімшілікке</span><h3 data-t="f_adminp">Админ панелі</h3><p data-t="f_admin_d">Барлық хабарламаны қарау, мәртебе беру, түсініктеме жазу, статистика мен есеп жүктеу.</p></article>
+  </div>
+ </div></div>
+
+ <div class="section" id="contacts"><div class="wrap">
+  <div class="section-head"><h2 data-t="contacts_title">Қайда хабарласу керек</h2><p data-t="contacts_desc">Заңсыз қоқыс үйіндісі туралы әкімдікке немесе мемлекеттік порталға хабарлауға болады. Нөмірлерді көшіріп алыңыз.</p></div>
+  <div class="contacts">
+   <div class="contact"><span class="phone">109</span><b data-t="c109">Әкімдіктің бірыңғай байланыс орталығы</b><p data-t="c109d">Аула, көше және қоғамдық орындардағы қоқыс, контейнерлердің толып кетуі. Көп қалада жұмыс істейді.</p></div>
+   <div class="contact"><span class="phone">1414</span><b data-t="c1414">Электрондық үкімет байланыс орталығы</b><p data-t="c1414d">Мемлекеттік қызметтер мен eOtinish өтініштері бойынша кеңес.</p></div>
+   <div class="contact"><span class="phone">112</span><b data-t="c112">Төтенше жағдайлар</b><p data-t="c112d">Қоқыс жанып жатса, түтін шықса немесе адам өміріне қауіп төнсе ғана.</p></div>
+   <div class="contact"><span class="phone text">eotinish.kz</span><b data-t="cot">eOtinish порталы</b><p data-t="cotd">Мемлекеттік органдарға жазбаша өтініш. Жауап беру мерзімі заңмен бекітілген.</p><a href="https://eotinish.kz" target="_blank" rel="noopener" data-t="open_site">Сайтты ашу</a></div>
+  </div>
+ </div></div>
+
+ <div class="section" id="impact"><div class="wrap">
+  <div class="section-head"><h2 data-t="impact_title">Жақсы шешім, өлшенетін нәтиже</h2><p data-t="impact_desc">Әр көрсеткіш нақты енгізілген деректерге сүйенеді. Жүйе прогресті бақылауға және үнем әлеуетін бағалауға көмектеседі.</p></div>
+  <div class="cards3">
+   <article class="card"><h3 data-t="metric_visibility">Толық көрініс</h3><p data-t="metric_visibility_d">Қалдық пен материал қозғалысы, қаладағы ластану нүктелері бір жерде.</p></article>
+   <article class="card"><h3 data-t="metric_prediction">Алдын ала болжам</h3><p data-t="metric_prediction_d">Тренд пен ықтимал тәуекелді ерте байқау.</p></article>
+   <article class="card"><h3 data-t="metric_saving">Үнем әлеуеті</h3><p data-t="metric_saving_d">Шығынды есептеу, салыстыру және мақсат қою.</p></article>
+  </div>
+ </div></div>
+
+ <div class="section faq"><div class="wrap">
+  <h2 style="margin-bottom:20px" data-t="faq_title">Жиі қойылатын сұрақтар</h2>
+  <details><summary data-t="q1">Хабарламаны кім көреді?</summary><p data-t="a1">Сурет, орын, қоқыс түрі және мәртебе картада барлығына ашық. Атыңызды жазу міндетті емес. Телефон нөміріңізді сипаттамаға жазбаңыз.</p></details>
+  <details><summary data-t="q2">Хабарлама әкімдікке автоматты түрде бара ма?</summary><p data-t="a2">Жоқ. Сайт дайын өтініш мәтінін және нөмірлерді береді, ал өтінішті сіз өзіңіз 109 немесе eOtinish арқылы жолдайсыз. Админ панелінде платформа әкімшілері мәртебені жаңартып отырады.</p></details>
+  <details><summary data-t="q3">Талдау қаншалықты дәл?</summary><p data-t="a3">Суретті жасанды интеллект талдайды, бірақ нәтиже бағалау ғана. Қоқыс түрін өзіңіз де белгілей аласыз. Қауіпті қалдық болса, оған қолмен тиіспеңіз.</p></details>
+  <details><summary data-t="q4">Неліктен картада көшелер жоқ?</summary><p data-t="a4">Карта Қазақстан шекарасы мен қалаларын көрсетеді, ал нақты нүкте координатамен сақталады. Әр хабарламаның ішінде нүктені көшелер картасында ашатын сілтеме бар.</p></details>
+  <details><summary data-t="q5">Кәсіпорын бөлімдері қайда?</summary><p data-t="a5">Жеке кабинетте: шолу, қалдық сканері, талдаушы, журнал, болжам, ұсыныстар, эко-көмекші, EcoScore, аналитика, калькулятор, есептер және қайта өңдеу нүктелері.</p></details>
+ </div></div>
+
+ <div class="wrap" style="padding-top:20px">
+  <div class="cta-band"><div><h2 data-t="cta_title">Ауланы бүгін тазартайық</h2><p data-t="cta_desc">Бір сурет, бір нүкте, бір өтініш. Қалғанын жүйе дайындайды.</p></div><a class="btn" href="/report" data-t="cta_report">Қоқысты хабарлау</a></div>
+ </div>
+</section>
+
+<!-- REPORT -->
+<section class="view" id="v-report">
+ <div class="wrap">
+  <div class="page-head"><div><div class="kicker" data-t="rep_kicker">Жаңа хабарлама</div><h1 data-t="rep_title">Қоқыс туралы хабарлау</h1><p data-t="rep_desc">Суретті жүктеңіз, орнын белгілеңіз және талдауды бастаңыз. Нәтижеде график, шешімдер, телефон нөмірлері мен дайын өтініш шығады.</p></div></div>
+  <div class="report-grid">
+   <div class="panel">
+    <form id="repForm" class="form" autocomplete="off">
+     <div class="span field">
+      <span data-t="f_photo">Қоқыстың суреті</span>
+      <label class="drop" id="drop" for="repPhoto">
+       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+       <b data-t="drop_title">Суретті таңдаңыз немесе осында сүйреңіз</b>
+       <small class="muted" data-t="drop_sub">JPG, PNG, WEBP немесе HEIC емес кез келген сурет, 15 MB дейін</small>
+       <input id="repPhoto" type="file" accept="image/*">
+      </label>
+      <div class="preview hidden" id="repPrevWrap"><img id="repPrev" alt=""><button type="button" class="btn sm soft" id="repClear" data-t="remove">Алып тастау</button></div>
+      <small id="exifNote"></small>
+     </div>
+     <div class="span field"><span data-t="f_types">Қоқыс түрі</span><div class="chips" id="typeChips"></div><small data-t="f_types_hint">Бірнешеуін таңдауға болады. Талдау кезінде жүйе суретке қарап нақтылайды.</small></div>
+     <label class="field"><span data-t="f_volume">Көлемі</span><select id="repVolume"></select></label>
+     <label class="field"><span data-t="f_city">Қала</span><select id="repCity"></select></label>
+     <label class="span field"><span data-t="f_address">Мекенжай немесе бағдар</span><input id="repAddress" maxlength="160" data-tp="ph_address" placeholder="Мысалы: Сарыарқа даңғылы 12, ауладағы гараждардың артында"></label>
+     <div class="span field"><span data-t="f_point">Картадағы нүкте</span><div class="pick-map" id="pickMap"></div><small data-t="f_point_hint">Картаны басып нүктені қойыңыз. Қала таңдалса, нүкте қала ортасына қойылады.</small></div>
+     <label class="field"><span data-t="f_lat">Ендік</span><input id="repLat" type="number" step="any" min="40" max="56" placeholder="51.1694"></label>
+     <label class="field"><span data-t="f_lng">Бойлық</span><input id="repLng" type="number" step="any" min="46" max="88" placeholder="71.4491"></label>
+     <label class="span field"><span data-t="f_desc">Сипаттама</span><textarea id="repDesc" maxlength="800" data-tp="ph_desc" placeholder="Не көрдіңіз, қашаннан бері жатыр, иісі немесе түтіні бар ма"></textarea></label>
+     <label class="field"><span data-t="f_name">Атыңыз (міндетті емес)</span><input id="repName" maxlength="60"></label>
+     <div class="field" style="justify-content:flex-end"><button class="btn primary full" type="submit" id="repAnalyze" data-t="analyze_btn">Суретті талдау</button></div>
+     <p class="span tiny muted" data-t="privacy">Сурет пен сипаттама картада барлығына көрінеді. Жеке деректерді, адамдардың беті мен көлік нөмірін суретке түсірмеуге тырысыңыз.</p>
+    </form>
+   </div>
+   <div class="panel" id="repResult">
+    <div class="result-empty">
+     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 20h18M6 20V10m6 10V4m6 16v-7"/></svg>
+     <h3 data-t="res_empty">Талдау нәтижесі осында шығады</h3>
+     <p data-t="res_empty_d">Құрам графигі, қауіп деңгейі, ыдырау уақыты, шешімдер, телефон нөмірлері және дайын өтініш мәтіні.</p>
+    </div>
+   </div>
+  </div>
+ </div>
+</section>
+
+<!-- MAP -->
+<section class="view" id="v-map">
+ <div class="wrap">
+  <div class="page-head"><div><div class="kicker" data-t="map_kicker">Ашық карта</div><h1 data-t="map_title">Ластану картасы</h1><p data-t="map_desc">Азаматтар хабарлаған қоқыс орындары суретімен. Белгінің жиегі мәртебені көрсетеді.</p></div><a class="btn primary" href="/report" data-t="cta_report">Қоқысты хабарлау</a></div>
+  <div class="stats-strip">
+   <div class="stat"><b id="msTotal">0</b><span data-t="s_total">Барлық хабарлама</span></div>
+   <div class="stat"><b id="msNew">0</b><span data-t="s_new">Жаңа</span></div>
+   <div class="stat"><b id="msProg">0</b><span data-t="s_progress">Қаралуда</span></div>
+   <div class="stat"><b id="msDone">0</b><span data-t="s_resolved">Шешілді</span></div>
+  </div>
+  <div class="toolbar">
+   <select id="mfCity"></select>
+   <select id="mfStatus"></select>
+   <select id="mfType"></select>
+   <label class="row" style="flex:0 0 auto;gap:8px"><input type="checkbox" id="mfPoints" style="width:auto" checked><span data-t="show_points">Қайта өңдеу нүктелері</span></label>
+  </div>
+  <div class="map-layout">
+   <div class="min0"><div class="big-map" id="bigMap"></div>
+    <div class="map-legend"><span><i style="border-color:var(--info)"></i><span data-t="s_new">Жаңа</span></span><span><i style="border-color:var(--warn)"></i><span data-t="s_progress">Қаралуда</span></span><span><i style="border-color:var(--ok)"></i><span data-t="s_resolved">Шешілді</span></span><span><i style="border-color:var(--ok);border-radius:4px;background:var(--ok)"></i><span data-t="show_points">Қайта өңдеу нүктелері</span></span></div>
+   </div>
+   <div class="map-side"><div class="row between"><b id="mapCount"></b><span class="tiny muted" id="mapSync"></span></div><div class="map-list" id="mapList"></div></div>
+  </div>
+ </div>
+</section>
+
+<!-- USER CABINET -->
+<section class="view" id="v-user">
+ <div class="wrap">
+  <div class="profile"><div class="avatar" id="uAvatar">Z</div><div><h2 id="uName" data-t="guest">Қонақ</h2><p class="muted" id="uRole"></p></div></div>
+  <div class="shell">
+   <nav class="side" id="uSide">
+    <div class="grp" data-t="g_citizen">Азамат</div>
+    <button data-tab="my" class="on" data-t="t_my">Менің хабарламаларым</button>
+    <button data-tab="profile" data-t="t_profile">Профиль және қауіпсіздік</button>
+    {% if me and (me.account_type == 'company' or me.role == 'admin') %}
+    <div class="grp" data-t="g_workspace">Кәсіпорын кеңістігі</div>
+    <button data-tab="dash" data-t="t_dash">Шолу</button>
+    <button data-tab="scanner" data-t="t_scanner">Қалдық сканері</button>
+    <button data-tab="analyzer" data-t="t_analyzer">Қалдық талдаушы</button>
+    <button data-tab="monitor" data-t="t_monitor">Қалдық журналы</button>
+    <button data-tab="pred" data-t="t_pred">Болжам</button>
+    <button data-tab="recs" data-t="t_recs">Ұсыныстар</button>
+    <button data-tab="assistant" data-t="t_assistant">Эко-көмекші</button>
+    <button data-tab="eco" data-t="t_eco">EcoScore</button>
+    <button data-tab="points" data-t="t_points">Қайта өңдеу нүктелері</button>
+    <div class="grp" data-t="g_insights">Талдау</div>
+    <button data-tab="analytics" data-t="t_analytics">Аналитика</button>
+    <button data-tab="calc" data-t="t_calc">Бизнес калькулятор</button>
+    <button data-tab="reports" data-t="t_reports">Есептер</button>
+    <a class="side-link" href="/classic" data-t="classic">Бұрынғы басқару орталығы</a>
+    {% endif %}
+   </nav>
+   <div class="min0">
+    <!-- my reports -->
+    <div class="tab on" id="t-my">
+     <div class="kpis">
+      <div class="stat"><b id="myTotal">0</b><span data-t="s_total">Барлық хабарлама</span></div>
+      <div class="stat"><b id="myNew">0</b><span data-t="s_new">Жаңа</span></div>
+      <div class="stat"><b id="myProg">0</b><span data-t="s_progress">Қаралуда</span></div>
+      <div class="stat"><b id="myDone">0</b><span data-t="s_resolved">Шешілді</span></div>
+     </div>
+     <div class="row between" style="margin-bottom:14px"><a class="btn primary" href="/report" data-t="cta_report">Қоқысты хабарлау</a><a class="btn ghost" href="/api/reports/mine.csv" data-t="dl_my">Менің хабарламаларым, CSV</a></div>
+     <div class="stack" id="myList"></div>
+    </div>
+    <!-- profile -->
+    <div class="tab" id="t-profile">
+     <div class="page-head"><div><h2 data-t="t_profile">Профиль және қауіпсіздік</h2><p data-t="pf_desc">Жеке деректеріңізді жаңартып, құпиясөзді өзгертіңіз.</p></div></div>
+     <div class="two eq">
+      <div class="panel"><h3 style="margin-bottom:16px" data-t="pf_data">Жеке деректер</h3>
+       <form id="pfForm" class="form">
+        <label class="field span"><span>Email</span><input value="{{ me.email if me else '' }}" disabled></label>
+        <label class="field"><span data-t="rg_name">Аты-жөні</span><input id="pfName" maxlength="60" required value="{{ me.name if me else '' }}"></label>
+        <label class="field"><span data-t="f_city">Қала</span><select id="pfCity"><option value="">—</option>{% for c in cities %}<option{% if me and me.city==c %} selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+        <label class="field"><span data-t="rg_phone">Телефон, міндетті емес</span><input id="pfPhone" maxlength="20" value="{{ me.phone if me else '' }}" placeholder="+7 7xx xxx xx xx"></label>
+        <label class="field"><span data-t="rg_type">Аккаунт түрі</span><select id="pfType"><option value="citizen" data-t="rg_citizen"{% if me and me.account_type=='citizen' %} selected{% endif %}>Азамат</option><option value="company" data-t="rg_company_t"{% if me and me.account_type=='company' %} selected{% endif %}>Кәсіпорын</option></select></label>
+        <label class="field span" id="pfCompanyWrap"><span data-t="rg_company">Компания атауы</span><input id="pfCompany" maxlength="80" value="{{ me.company if me else '' }}"></label>
+        <p class="span tiny muted" data-t="pf_type_hint">Кәсіпорын аккаунты жеке кабинетке қалдық журналы, болжам, сканер және есептер бөлімдерін қосады.</p>
+        <button class="btn primary span" type="submit" data-t="save">Сақтау</button>
+       </form></div>
+      <div class="panel"><h3 style="margin-bottom:16px" data-t="pf_pass">Құпиясөзді өзгерту</h3>
+       <form id="pwForm" class="form">
+        <label class="field span"><span data-t="pf_cur">Қазіргі құпиясөз</span><input id="pwCur" type="password" autocomplete="current-password" required></label>
+        <label class="field"><span data-t="pf_new">Жаңа құпиясөз</span><input id="pwNew" type="password" autocomplete="new-password" minlength="8" maxlength="64" required></label>
+        <label class="field"><span data-t="rg_pass2">Құпиясөзді қайталаңыз</span><input id="pwNew2" type="password" autocomplete="new-password" required></label>
+        <p class="span tiny muted" data-t="rg_pass_rule">Кемінде 8 таңба, ішінде әріп пен цифр болсын. Email-дің бір бөлігін қолданбаңыз.</p>
+        <button class="btn primary span" type="submit" data-t="pf_change">Құпиясөзді өзгерту</button>
+       </form>
+       <div class="kv" style="margin-top:18px"><span data-t="pf_role">Рөл</span><b id="pfRole"></b></div>
+       <div class="kv"><span data-t="pf_since">Тіркелген күні</span><b class="num">{{ me.created_at[:10] if me else '' }}</b></div>
+      </div>
+     </div>
+    </div>
+    <!-- dashboard -->
+    <div class="tab" id="t-dash">
+     <div class="page-head"><div><h2 data-t="dash_title">Өндіріс бақылау орталығы</h2><p data-t="dash_desc">Кәсіпорныңыздың қалдық көрсеткіштері мен экологиялық тиімділігі.</p></div><span class="pill sev" id="wsBadge"></span></div>
+     <div class="kpis">
+      <div class="stat"><span data-t="k_total">Жалпы қалдық көлемі</span><b id="dTotal">0</b><span>kg</span></div>
+      <div class="stat"><span data-t="k_recycled">Қайта өңдеуге бағытталған</span><b id="dRec">0</b><span data-t="k_recycled_d">kg, жалпының 62%</span></div>
+      <div class="stat"><span data-t="k_cost">Қалдықтың есептік құны</span><b id="dCost">0</b><span>₸</span></div>
+      <div class="stat"><span data-t="k_records">Тіркелген операциялар</span><b id="dCount">0</b><span data-t="k_records_d">жазба</span></div>
+     </div>
+     <div class="two">
+      <div class="panel"><div class="panel-head"><div><h3 data-t="trend_title">Қалдық динамикасы</h3><p data-t="trend_desc">Айлар бойынша тіркелген қалдық көлемі</p></div></div><div class="cv"><canvas id="cTrend"></canvas></div></div>
+      <div class="panel"><div class="panel-head"><div><h3 data-t="mat_title">Материалдар құрамы</h3><p data-t="mat_desc">Қалдық түрлері бойынша үлес</p></div></div><div class="cv"><canvas id="cMat"></canvas></div></div>
+     </div>
+     <div class="two">
+      <div class="panel"><div class="panel-head"><div><h3 data-t="recent_title">Соңғы қалдық жазбалары</h3></div><button class="btn sm ghost" data-go="monitor" data-t="see_all">Барлығын көру</button></div><div class="table-wrap"><table><thead><tr><th data-t="th_date">Күні</th><th data-t="th_mat">Материал</th><th data-t="th_src">Көзі</th><th data-t="th_amount">Мөлшері</th></tr></thead><tbody id="recentRows"></tbody></table></div></div>
+      <div class="panel"><div class="panel-head"><div><h3 data-t="fc_title">Болжам</h3><p data-t="fc_desc">Келесі 7 күнге есептік болжам</p></div></div><div class="big-num" id="dFc">0<small>kg</small></div><p class="muted" id="dFcTrend"></p><p class="small muted" style="margin-top:12px" data-t="fc_note">Болжам соңғы тіркелген деректердің орташа мәні мен өзгеріс бағытына сүйенеді.</p><button class="btn soft full" style="margin-top:16px" data-go="pred" data-t="fc_more">Толық болжамды көру</button></div>
+     </div>
+    </div>
+    <!-- scanner -->
+    <div class="tab" id="t-scanner">
+     <div class="page-head"><div><h2 data-t="t_scanner">Қалдық сканері</h2><p data-t="sc_desc">Өндірістік қалдық суретін жүктеп, материал түрін тіркеңіз және сұрыптау нұсқауын алыңыз.</p></div></div>
+     <div class="two eq">
+      <div class="panel"><form id="scForm" class="form">
+       <div class="span field"><label class="drop" for="scPhoto"><b data-t="drop_title">Суретті таңдаңыз немесе осында сүйреңіз</b><small class="muted" data-t="sc_drop_sub">Өндірістік қалдықтың анық суреті</small><input id="scPhoto" type="file" accept="image/*"></label><div class="preview hidden" id="scPrevWrap"><img id="scPrev" alt=""></div></div>
+       <label class="field"><span data-t="sc_mat">Материал түрін растаңыз</span><select id="scMat"></select></label>
+       <label class="field"><span data-t="sc_note">Ескерту</span><input id="scNote" maxlength="120" data-tp="ph_sc_note" placeholder="Мысалы: қаптама цехынан"></label>
+       <button class="btn primary span" type="submit" id="scBtn" data-t="sc_btn">Суретті талдау және сақтау</button>
+      </form></div>
+      <div class="panel" id="scResult"><div class="result-empty"><h3 data-t="sc_empty">Сканер нәтижесі осында шығады</h3><p data-t="sc_empty_d">Суретті жүктеп, материал түрін растаңыз.</p></div></div>
+     </div>
+     <div class="panel" style="margin-top:20px"><div class="panel-head"><div><h3 data-t="sc_hist">Соңғы сканерлеулер</h3><p data-t="sc_hist_d">Осы кабинетте сақталған суреттер</p></div></div><div class="scan-grid" id="scHist"></div></div>
+    </div>
+    <!-- analyzer -->
+    <div class="tab" id="t-analyzer">
+     <div class="page-head"><div><h2 data-t="t_analyzer">Қалдық талдаушы</h2><p data-t="an_desc">Өндіріс деректерін енгізіп, қалдық деңгейін бағалаңыз.</p></div></div>
+     <div class="two eq">
+      <div class="panel"><form id="anForm" class="form">
+       <label class="field"><span data-t="an_mat">Материал түрі</span><select id="anMat"></select></label>
+       <label class="field"><span data-t="an_prod">Өндірілген өнім көлемі, kg</span><input id="anProd" type="number" min="1" step="0.1" value="5000" required></label>
+       <label class="field"><span data-t="an_waste">Қалдық көлемі, kg</span><input id="anWaste" type="number" min="0" step="0.1" value="250" required></label>
+       <div class="field" style="justify-content:flex-end"><button class="btn primary full" type="submit" data-t="an_btn">Талдау</button></div>
+       <p class="span note info small" data-t="an_hint">Қалдық көлемі өндірілген өнім көлемінен аспауы керек.</p>
+      </form></div>
+      <div class="panel" id="anResult"><div class="result-empty"><h3 data-t="an_empty">Талдау нәтижесі осында шығады</h3></div></div>
+     </div>
+     <p class="note small" style="margin-top:20px" data-t="an_model">Бұл бөлім қалдық үлесін материал түріне арналған шартты шекпен салыстыратын ережелік алгоритмді қолданады. Нақты өндірістік қолдану үшін өлшенген деректермен модельді оқыту қажет.</p>
+    </div>
+    <!-- monitor -->
+    <div class="tab" id="t-monitor">
+     <div class="page-head"><div><h2 data-t="t_monitor">Қалдық журналы</h2><p data-t="mo_desc">Қалдық операцияларын тіркеңіз және басқарыңыз.</p></div><button class="btn primary" id="moOpen" data-t="mo_new">Жаңа жазба</button></div>
+     <div class="panel hidden" id="moFormPanel" style="margin-bottom:20px"><form id="moForm" class="form">
+      <label class="field"><span data-t="th_date">Күні</span><input id="moDate" type="date" required></label>
+      <label class="field"><span data-t="th_mat">Материал</span><select id="moMat"></select></label>
+      <label class="field"><span data-t="th_amount">Мөлшері</span><input id="moAmount" type="number" min="0.1" step="0.1" required placeholder="100"></label>
+      <label class="field"><span data-t="mo_unit">Өлшем бірлігі</span><select id="moUnit"><option>kg</option><option>ton</option><option>pcs</option><option>L</option></select></label>
+      <label class="field"><span data-t="th_cost">Құны, ₸</span><input id="moCost" type="number" min="0" step="1" required placeholder="25000"></label>
+      <label class="field"><span data-t="th_src">Көзі</span><select id="moSrc"></select></label>
+      <label class="span field"><span data-t="sc_note">Ескерту</span><input id="moNote" maxlength="160"></label>
+      <div class="span row"><button class="btn primary" type="submit" data-t="save">Сақтау</button><button class="btn ghost" type="button" id="moClose" data-t="cancel">Болдырмау</button></div>
+     </form></div>
+     <div class="panel"><div class="panel-head"><div><h3 data-t="mo_log">Қалдықтар журналы</h3></div><input id="moSearch" style="max-width:280px" data-tp="ph_search" placeholder="Материал немесе көзі бойынша іздеу"></div><div class="table-wrap"><table><thead><tr><th data-t="th_date">Күні</th><th data-t="th_mat">Материал</th><th data-t="th_src">Көзі</th><th data-t="th_amount">Мөлшері</th><th data-t="th_cost">Құны</th><th></th></tr></thead><tbody id="moRows"></tbody></table></div></div>
+    </div>
+    <!-- predictions -->
+    <div class="tab" id="t-pred">
+     <div class="page-head"><div><h2 data-t="t_pred">Болжам</h2><p data-t="pr_desc">Тарихи деректер негізінде қалдық көлемінің болжамы.</p></div></div>
+     <div class="kpis">
+      <div class="stat"><span data-t="pr_7">Келесі 7 күн</span><b id="pNext">0</b><span>kg</span></div>
+      <div class="stat"><span data-t="pr_conf">Сенімділік</span><b id="pConf">0</b><span data-t="pr_conf_d">%, дерек санына тәуелді</span></div>
+      <div class="stat"><span data-t="pr_30">Келесі 30 күн</span><b id="pNext30">0</b><span>kg</span></div>
+      <div class="stat"><span data-t="pr_trend">Өзгеріс бағыты</span><b id="pTrend" style="font-size:1.3rem">-</b><span data-t="pr_trend_d">соңғы кезеңдер салыстыруы</span></div>
+     </div>
+     <div class="panel"><h3 style="margin-bottom:16px" data-t="pr_how">Болжам қалай есептеледі</h3>
+      <div class="steps"><div class="step"><span class="n">1</span><b data-t="pr_s1">Деректерді жинау</b><p data-t="pr_s1d">Тіркелген қалдық операциялары оқылады.</p></div><div class="step"><span class="n">2</span><b data-t="pr_s2">Орташа мән</b><p data-t="pr_s2d">Соңғы 14 күндегі орташа күндік көлем есептеледі.</p></div><div class="step"><span class="n">3</span><b data-t="pr_s3">Трендті салыстыру</b><p data-t="pr_s3d">Соңғы апта алдыңғы кезеңмен салыстырылады.</p></div><div class="step"><span class="n">4</span><b data-t="pr_s4">Болжам</b><p data-t="pr_s4d">Келесі 7 және 30 күнге ықтимал көлем көрсетіледі.</p></div></div>
+      <p class="note small" style="margin-top:18px" data-t="pr_limit">Бұл бастапқы базалық болжам. Ол маусымдылықты, өндіріс жоспарын немесе жабдық күйін әлі есепке алмайды.</p>
+     </div>
+    </div>
+    <!-- recommendations -->
+    <div class="tab" id="t-recs">
+     <div class="page-head"><div><h2 data-t="t_recs">Ұсыныстар</h2><p data-t="rc_desc">Қалдықты азайтуға арналған дерекке негізделген ұсыныстар.</p></div></div>
+     <div class="recs" id="recList"></div>
+    </div>
+    <!-- assistant -->
+    <div class="tab" id="t-assistant">
+     <div class="page-head"><div><h2 data-t="t_assistant">Эко-көмекші</h2><p data-t="as_desc">Кәсіпорын деректеріне сүйенген экологиялық кеңесші.</p></div><span class="pill sev" id="asMode"></span></div>
+     <div class="panel">
+      <div class="chat" id="chat"><div class="bubble bot" data-t="as_hello">Сәлем! Мен қалдық көлемі, болжам, қайта өңдеу және үнем туралы сұрақтарға жүйедегі деректер негізінде жауап беремін.</div></div>
+      <div class="chips" style="margin-bottom:14px"><button type="button" class="chip" data-q="as_q1" data-t="as_q1s">Ең көп қалдық қайсы?</button><button type="button" class="chip" data-q="as_q2" data-t="as_q2s">30 күндік болжам</button><button type="button" class="chip" data-q="as_q3" data-t="as_q3s">Қалай үнемдеймін?</button><button type="button" class="chip" data-q="as_q4" data-t="as_q4s">Қалай сұрыптаймын?</button></div>
+      <form id="asForm" class="row" style="flex-wrap:nowrap"><input id="asInput" maxlength="500" data-tp="ph_ask" placeholder="Сұрағыңызды жазыңыз"><button class="btn primary" type="submit" data-t="send">Жіберу</button></form>
+     </div>
+    </div>
+    <!-- ecoscore -->
+    <div class="tab" id="t-eco">
+     <div class="page-head"><div><h2 data-t="t_eco">EcoScore</h2><p data-t="eco_desc">Деректерді тіркеу тәртібі мен материалдарды есепке алу бойынша индекс.</p></div></div>
+     <div class="two eq">
+      <div class="panel" style="text-align:center"><div class="ring" id="ecoRing"><div><span><b id="ecoVal">0</b><span class="muted">/ 100</span></span></div></div><h3 id="ecoGrade"></h3><div class="kv"><span data-t="k_total">Жалпы қалдық көлемі</span><b id="ecoTotal"></b></div><div class="kv"><span data-t="k_records">Тіркелген операциялар</span><b id="ecoRecs"></b></div></div>
+      <div class="panel"><h3 style="margin-bottom:16px" data-t="eco_parts">Бағалау құрамы</h3><div id="ecoComps"></div><p class="note small" data-t="eco_note">EcoScore осы платформаның ашық формуламен есептелетін индексі. Ол ресми экологиялық сертификат немесе көміртек аудиті емес.</p></div>
+     </div>
+    </div>
+    <!-- recycling points -->
+    <div class="tab" id="t-points">
+     <div class="page-head"><div><h2 data-t="t_points">Қайта өңдеу нүктелері</h2><p data-t="pt_desc">Өз нүктелеріңізді қосыңыз. Олар ортақ картада қайта өңдеу қабатында көрінеді.</p></div><a class="btn ghost" href="/map" data-t="cta_map">Ластану картасын ашу</a></div>
+     <div class="two eq">
+      <div class="panel"><form id="ptForm" class="form">
+       <label class="field"><span data-t="pt_name">Нүкте атауы</span><input id="ptName" required maxlength="80"></label>
+       <label class="field"><span data-t="th_mat">Материал</span><select id="ptMat"></select></label>
+       <label class="span field"><span data-t="f_address">Мекенжай немесе бағдар</span><input id="ptAddr" required maxlength="140"></label>
+       <label class="field"><span data-t="f_lat">Ендік</span><input id="ptLat" type="number" step="any" required placeholder="51.1694"></label>
+       <label class="field"><span data-t="f_lng">Бойлық</span><input id="ptLng" type="number" step="any" required placeholder="71.4491"></label>
+       <label class="span field"><span data-t="pt_phone">Телефон, міндетті емес</span><input id="ptPhone" maxlength="30" placeholder="+7"></label>
+       <button class="btn primary span" type="submit" data-t="save">Сақтау</button>
+      </form></div>
+      <div class="panel"><h3 style="margin-bottom:12px" data-t="pt_list">Нүктелер тізімі</h3><div id="ptList" class="stack"></div><p class="note small" style="margin-top:14px" data-t="pt_demo">Үлгі деп белгіленген нүктелер нақты қабылдау орындары ретінде расталмаған.</p></div>
+     </div>
+    </div>
+    <!-- analytics -->
+    <div class="tab" id="t-analytics">
+     <div class="page-head"><div><h2 data-t="t_analytics">Аналитика</h2><p data-t="al_desc">Материалдар мен өндіріс қалдықтарының жиынтық көрінісі.</p></div><button class="btn ghost" data-dl="csv" data-t="dl_csv">CSV жүктеу</button></div>
+     <div class="two eq">
+      <div class="panel"><h3 style="margin-bottom:14px" data-t="al_month">Айлық қалдық көлемі</h3><div class="cv tall"><canvas id="aTrend"></canvas></div></div>
+      <div class="panel"><h3 style="margin-bottom:14px" data-t="al_mat">Материалдар бойынша</h3><div class="cv tall"><canvas id="aMat"></canvas></div></div>
+     </div>
+     <div class="two eq">
+      <div class="panel"><h3 style="margin-bottom:14px" data-t="al_src">Қалдық көздері бойынша</h3><div class="cv"><canvas id="aSrc"></canvas></div></div>
+      <div class="panel"><h3 style="margin-bottom:14px" data-t="al_split">Қайта өңдеу мен полигон</h3><div class="cv"><canvas id="aSplit"></canvas></div></div>
+     </div>
+     <p class="note small" data-t="al_note">Графиктер осы кабинетке тіркелген қалдық жазбаларынан құралады. Үлгі деректер бастапқыда берілген; өз жазбаларыңызды қосқан соң көрсеткіштер автоматты жаңарады.</p>
+    </div>
+    <!-- calculator -->
+    <div class="tab" id="t-calc">
+     <div class="page-head"><div><h2 data-t="t_calc">Бизнес калькулятор</h2><p data-t="ca_desc">Қалдықты азайтудың ықтимал қаржылық әсерін есептеңіз.</p></div></div>
+     <div class="two eq">
+      <div class="panel"><form id="caForm" class="form">
+       <label class="field"><span data-t="ca_out">Айлық өндіріс көлемі, kg</span><input id="caOut" type="number" min="1" value="10000" required></label>
+       <label class="field"><span data-t="ca_rate">Қазіргі қалдық деңгейі, %</span><input id="caRate" type="number" min="0" max="100" step="0.1" value="8" required></label>
+       <label class="field"><span data-t="ca_cost">1 kg шикізат құны, ₸</span><input id="caCost" type="number" min="0" value="500" required></label>
+       <label class="field"><span data-t="ca_red">Қалдықты азайту мақсаты, %</span><input id="caRed" type="number" min="0" max="100" value="30" required></label>
+       <button class="btn primary span" type="submit" data-t="ca_btn">Үнемді есептеу</button>
+      </form></div>
+      <div class="panel"><h3 data-t="ca_res">Экономикалық нәтиже</h3><div class="big-num" id="caSave" style="margin:14px 0">0 ₸</div><span class="muted" data-t="ca_month">Айлық ықтимал үнем</span>
+       <div class="kv" style="margin-top:14px"><span data-t="ca_cur">Қазіргі айлық шығын</span><b id="caCur" class="num"></b></div><div class="kv"><span data-t="ca_year">Жылдық ықтимал үнем</span><b id="caYear" class="num" style="color:var(--ok)"></b></div><div class="kv"><span data-t="ca_new">Жаңа қалдық деңгейі</span><b id="caNew" class="num"></b></div>
+       <div class="cv" style="height:180px;margin-top:10px"><canvas id="caChart"></canvas></div>
+       <p class="small muted" data-t="ca_note">Нәтиже енгізілген параметрлерге негізделген сценарийлік есеп. Бұл кепілдендірілген табыс емес.</p></div>
+     </div>
+    </div>
+    <!-- reports -->
+    <div class="tab" id="t-reports">
+     <div class="page-head"><div><h2 data-t="t_reports">Есептер</h2><p data-t="re_desc">Өндірістік қалдықтар есебін экспорттаңыз.</p></div></div>
+     <div class="panel"><h3 data-t="re_card">Қалдық операцияларының есебі</h3><p class="muted" style="margin:8px 0 18px" data-t="re_card_d">Барлық тіркелген қалдық жазбалары CSV немесе Excel форматында жүктеледі.</p>
+      <div class="row"><button class="btn primary" data-dl="csv" data-t="dl_csv">CSV жүктеу</button><button class="btn ghost" data-dl="xls" data-t="dl_xls">Excel жүктеу</button><button class="btn soft" data-dl="myrep" data-t="dl_my">Менің хабарламаларым, CSV</button></div>
+      <div id="dlFallback" class="hidden" style="margin-top:16px"><p class="small muted" data-t="dl_fallback">Бұл көріністе файл жүктеу қолжетімсіз. Мәтінді көшіріп, .csv файлына сақтаңыз.</p><textarea id="dlText" readonly style="min-height:200px;font-family:var(--mono);font-size:.85rem"></textarea></div>
+     </div>
+     <div class="panel" style="margin-top:20px"><h3 style="margin-bottom:12px" data-t="re_fields">Есепке кіретін деректер</h3><p class="muted" data-t="re_fields_d">Күні, материал түрі, қалдық мөлшері, өлшем бірлігі, құны, қалдық көзі, ескерту.</p></div>
+    </div>
+   </div>
+  </div>
+ </div>
+</section>
+
+<!-- ADMIN -->
+<section class="view" id="v-admin">
+ <div class="wrap">
+  <div id="admLock" class="lock">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+   <h2 data-t="adm_lock">Админ панеліне тек әкімшілер кіре алады</h2>
+   <p class="muted" data-t="adm_lock_d">Әкімші құқығы сайт иесіне және ол редактор етіп қосқан адамдарға беріледі. Хабарлама жіберу және картаны қарау барлығына ашық.</p>
+   <div class="row" style="justify-content:center"><a class="btn primary" href="/map" data-t="cta_map">Ластану картасын ашу</a><a class="btn ghost" href="/cabinet" data-t="nav_user">Жеке кабинет</a></div>
+  </div>
+  <div id="admBody" class="hidden">
+   <div class="page-head"><div><div class="kicker" data-t="adm_kicker">Басқару</div><h1 data-t="nav_admin">Админ панелі</h1><p data-t="adm_desc">Барлық хабарламаларды қарап, мәртебе беріңіз, түсініктеме жазыңыз және есеп жүктеңіз.</p></div><button class="btn ghost" id="admExport" data-t="adm_export">Барлық хабарлама, CSV</button></div>
+   <div class="kpis">
+    <div class="stat"><b id="aTotal">0</b><span data-t="s_total">Барлық хабарлама</span></div>
+    <div class="stat"><b id="aNew">0</b><span data-t="s_new">Жаңа</span></div>
+    <div class="stat"><b id="aProg">0</b><span data-t="s_progress">Қаралуда</span></div>
+    <div class="stat"><b id="aRate">0%</b><span data-t="s_rate">Шешілу үлесі</span></div>
+   </div>
+   <div class="two eq">
+    <div class="panel"><h3 style="margin-bottom:14px" data-t="adm_daily">Соңғы 14 күндегі хабарламалар</h3><div class="cv"><canvas id="admDaily"></canvas></div></div>
+    <div class="panel"><h3 style="margin-bottom:14px" data-t="adm_status">Мәртебе бойынша</h3><div class="cv"><canvas id="admStatus"></canvas></div></div>
+   </div>
+   <div class="two eq">
+    <div class="panel"><h3 style="margin-bottom:14px" data-t="adm_types">Қоқыс түрлері</h3><div class="cv"><canvas id="admTypes"></canvas></div></div>
+    <div class="panel"><h3 style="margin-bottom:14px" data-t="adm_cities">Қалалар бойынша</h3><div class="cv"><canvas id="admCities"></canvas></div></div>
+   </div>
+   <div class="panel">
+    <div class="panel-head"><div><h3 data-t="adm_list">Хабарламалар</h3><p data-t="adm_list_d">Мәртебені өзгерту бірден картада және автордың кабинетінде көрінеді.</p></div></div>
+    <div class="toolbar"><input id="afSearch" data-tp="ph_search2" placeholder="Мекенжай, сипаттама немесе автор бойынша іздеу"><select id="afStatus"></select><select id="afCity"></select><select id="afSev"></select></div>
+    <div class="table-wrap"><table class="adm-table"><thead><tr><th data-t="th_photo">Сурет</th><th data-t="th_place">Орны</th><th data-t="th_type">Түрі</th><th data-t="th_sev">Қауіп</th><th data-t="th_date">Күні</th><th data-t="th_status">Мәртебе</th><th data-t="th_comment">Түсініктеме</th><th></th></tr></thead><tbody id="admRows"></tbody></table></div>
+   </div>
+   <div class="panel" style="margin-top:20px">
+    <div class="panel-head"><div><h3 data-t="adm_users">Пайдаланушылар</h3><p data-t="adm_users_d">Рөл беріңіз немесе ережені бұзғандарды бұғаттаңыз. Бұғатталған адам кіре алмайды және хабарлама жібере алмайды.</p></div><input id="auSearch" style="max-width:280px" data-tp="ph_search3" placeholder="Аты немесе email бойынша іздеу"></div>
+    <div class="table-wrap"><table><thead><tr><th data-t="rg_name">Аты-жөні</th><th>Email</th><th data-t="rg_type">Аккаунт түрі</th><th data-t="s_total">Хабарлама</th><th data-t="au_last">Соңғы кіру</th><th data-t="pf_role">Рөл</th><th data-t="au_block">Бұғат</th></tr></thead><tbody id="auRows"></tbody></table></div>
+   </div>
+  </div>
+ </div>
+</section>
+</main>
+
+<footer><div class="wrap"><span>© 2026 Zero Waste AI</span><span data-t="footer_line">Өндірісті ақылды ет. Қалдықты азайт. Қаланы таза ұста.</span><span id="connState"></span></div></footer>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<dialog id="detail" class="detail"><div class="row between" style="margin-bottom:10px"><h3 data-t="open_details">Толығырақ</h3><button class="btn sm soft" type="button" id="detailClose" data-t="close">Жабу</button></div><div id="detailBody"></div></dialog>
+<script>window.ZW_BOOT={view:{{ view|tojson }},me:{{ me|tojson }},csrf:{{ csrf_token()|tojson }}};</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='site-i18n.js') }}"></script>
+<script src="{{ url_for('static', filename='site.js') }}"></script>
+</body>
+</html>

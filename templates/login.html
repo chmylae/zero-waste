@@ -1,0 +1,21 @@
+{% extends '_auth_base.html' %}
+{% block title %}Кіру · Zero Waste AI{% endblock %}
+{% block content %}
+<h2 data-t="login_title">Жүйеге кіру</h2>
+<p class="muted" style="margin:8px 0 22px" data-t="login_sub">Email мен құпиясөзді енгізіңіз. Әкімшілер де осы бет арқылы кіреді.</p>
+<form method="post" class="form auth-form" novalidate>
+ <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+ <input type="hidden" name="next" value="{{ request.args.get('next','') }}">
+ <label class="field span"><span>Email</span><input type="email" name="email" value="{{ form.email or '' }}" required maxlength="120" autocomplete="email" placeholder="name@mail.kz"></label>
+ <label class="field span"><span data-t="rg_pass">Құпиясөз</span>
+  <span class="pass-wrap"><input type="password" name="password" required maxlength="64" autocomplete="current-password" id="pw"><button type="button" class="pass-toggle" data-for="pw" data-t="show">Көрсету</button></span></label>
+ <label class="check span"><input type="checkbox" name="remember" value="1"><span data-t="remember">Мені 30 күн есте сақта</span></label>
+ <button class="btn primary full span" type="submit" data-t="login">Кіру</button>
+</form>
+<p class="auth-switch"><span data-t="no_account">Аккаунтыңыз жоқ па?</span> <a href="/register" data-t="register">Тіркелу</a></p>
+<div class="demo-box">
+ <b data-t="demo_accounts">Тексеруге арналған аккаунттар</b>
+ <span><span data-t="demo_company">Кәсіпорын</span>: <code>demo@zerowaste.ai</code> / <code>demo1234</code></span>
+ <span data-t="demo_admin_note">Әкімші аккаунты README файлында көрсетілген. Алғашқы кіруден кейін құпиясөзді міндетті түрде өзгертіңіз.</span>
+</div>
+{% endblock %}

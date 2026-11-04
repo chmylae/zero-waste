@@ -1,0 +1,38 @@
+{% extends '_auth_base.html' %}
+{% block title %}Тіркелу · Zero Waste AI{% endblock %}
+{% macro err(name) %}{% if errors.get(name) %}<small class="err" data-t="{{ errors[name] }}">{{ errors[name] }}</small>{% endif %}{% endmacro %}
+{% block content %}
+<h2 data-t="reg_title">Аккаунт ашу</h2>
+<p class="muted" style="margin:8px 0 22px" data-t="reg_sub">Тіркелген соң қоқыс туралы хабарлама жіберіп, оның мәртебесін жеке кабинеттен бақылай аласыз.</p>
+<form method="post" class="form auth-form" id="regForm" novalidate>
+ <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+ <label class="hp" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label>
+ <div class="field span"><span data-t="rg_type">Аккаунт түрі</span>
+  <div class="seg" role="radiogroup">
+   <label><input type="radio" name="account_type" value="citizen" {% if form.get('account_type','citizen')=='citizen' %}checked{% endif %}><span><b data-t="rg_citizen">Азамат</b><small data-t="rg_citizen_d">Хабарлама жіберу және бақылау</small></span></label>
+   <label><input type="radio" name="account_type" value="company" {% if form.get('account_type')=='company' %}checked{% endif %}><span><b data-t="rg_company_t">Кәсіпорын</b><small data-t="rg_company_d">Қосымша қалдық журналы, болжам, есептер</small></span></label>
+  </div>
+ </div>
+ <label class="field span"><span data-t="rg_name">Аты-жөні</span><input name="name" value="{{ form.get('name','') }}" required minlength="2" maxlength="60" autocomplete="name">{{ err('name') }}<small class="hint" data-t="rg_name_hint">2–60 әріп, цифрсыз</small></label>
+ <label class="field span" id="companyField"><span data-t="rg_company">Компания атауы</span><input name="company" value="{{ form.get('company','') }}" maxlength="80" autocomplete="organization">{{ err('company') }}</label>
+ <label class="field span"><span>Email</span><input type="email" name="email" value="{{ form.get('email','') }}" required maxlength="120" autocomplete="email" placeholder="name@mail.kz">{{ err('email') }}</label>
+ <label class="field"><span data-t="f_city">Қала</span><select name="city"><option value="" data-t="choose_city">Қаланы таңдаңыз</option>{% for c in cities %}<option{% if form.get('city')==c %} selected{% endif %}>{{ c }}</option>{% endfor %}</select>{{ err('city') }}</label>
+ <label class="field"><span data-t="rg_phone">Телефон, міндетті емес</span><input name="phone" value="{{ form.get('phone','') }}" maxlength="20" autocomplete="tel" placeholder="+7 7xx xxx xx xx">{{ err('phone') }}</label>
+ <label class="field span"><span data-t="rg_pass">Құпиясөз</span>
+  <span class="pass-wrap"><input type="password" name="password" id="pw" required minlength="8" maxlength="64" autocomplete="new-password"><button type="button" class="pass-toggle" data-for="pw" data-t="show">Көрсету</button></span>
+  <span class="strength"><i id="pwBar"></i></span><small class="hint" id="pwHint" data-t="rg_pass_rule">Кемінде 8 таңба, ішінде әріп пен цифр болсын. Email-дің бір бөлігін қолданбаңыз.</small>{{ err('password') }}</label>
+ <label class="field span"><span data-t="rg_pass2">Құпиясөзді қайталаңыз</span><input type="password" name="password2" id="pw2" required maxlength="64" autocomplete="new-password">{{ err('password2') }}<small class="err hidden" id="pw2Err" data-t="err_password2">Құпиясөздер сәйкес емес</small></label>
+ <label class="check span"><input type="checkbox" name="terms" value="1" {% if form.get('terms') %}checked{% endif %}><span data-t="rg_terms">Мен жариялаған сурет пен орын картада барлығына көрінетінін түсінемін және платформа ережелерімен келісемін</span></label>{{ err('terms') }}
+ <button class="btn primary full span" type="submit" data-t="register">Тіркелу</button>
+</form>
+<details class="rules"><summary data-t="rules_title">Платформа ережелері</summary>
+ <ul class="list">
+  <li data-t="rule1">Тек нақты қоқыс орындарының өз түсірген суреттерін жүктеңіз.</li>
+  <li data-t="rule2">Суретте адамдардың беті мен көлік нөмірі анық көрінбеуі керек.</li>
+  <li data-t="rule3">Сипаттамаға телефон нөмірі мен жеке деректерді жазбаңыз.</li>
+  <li data-t="rule4">Бір тәулікте 10 хабарламадан артық жіберуге болмайды.</li>
+  <li data-t="rule5">Жалған немесе қорлайтын хабарлама үшін аккаунт бұғатталады.</li>
+ </ul>
+</details>
+<p class="auth-switch"><span data-t="has_account">Аккаунтыңыз бар ма?</span> <a href="/login" data-t="login">Кіру</a></p>
+{% endblock %}
