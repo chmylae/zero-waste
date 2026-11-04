@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: zero-waste-ai
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 1 --threads 4 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: ZERO_WASTE_SECRET
+        generateValue: true
+      - key: ZERO_WASTE_HTTPS
+        value: "1"
+      - key: ZERO_WASTE_ADMIN_EMAIL
+        sync: false
+      - key: ZERO_WASTE_ADMIN_PASSWORD
+        sync: false
